@@ -24,9 +24,25 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Install UPX
+        run: choco install upx -y
+
       - name: Build EXE with PyInstaller
         run: |
-          pyinstaller --onefile --windowed --name ExcelExtractor main.py
+          pyinstaller --onefile --windowed --name ExcelExtractor `
+            --exclude-module matplotlib `
+            --exclude-module numpy.testing `
+            --exclude-module pandas.tests `
+            --exclude-module PIL `
+            --exclude-module tkinter.test `
+            --exclude-module unittest `
+            --exclude-module email `
+            --exclude-module html `
+            --exclude-module http `
+            --exclude-module urllib `
+            --exclude-module xml `
+            --upx-dir "C:\ProgramData\chocolatey\bin" `
+            main.py
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
