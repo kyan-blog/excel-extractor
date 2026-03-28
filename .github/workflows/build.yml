@@ -41,6 +41,37 @@ jobs:
             --exclude-module http `
             --exclude-module urllib `
             --exclude-module xml `
+            --exclude-module asyncio `
+            --exclude-module concurrent `
+            --exclude-module ctypes `
+            --exclude-module curses `
+            --exclude-module distutils `
+            --exclude-module doctest `
+            --exclude-module ftplib `
+            --exclude-module getpass `
+            --exclude-module glob `
+            --exclude-module gzip `
+            --exclude-module hashlib `
+            --exclude-module imaplib `
+            --exclude-module ipaddress `
+            --exclude-module logging `
+            --exclude-module lzma `
+            --exclude-module multiprocessing `
+            --exclude-module pickle `
+            --exclude-module pprint `
+            --exclude-module profile `
+            --exclude-module pydoc `
+            --exclude-module smtplib `
+            --exclude-module socket `
+            --exclude-module sqlite3 `
+            --exclude-module ssl `
+            --exclude-module tarfile `
+            --exclude-module telnetlib `
+            --exclude-module termios `
+            --exclude-module textwrap `
+            --exclude-module tokenize `
+            --exclude-module traceback `
+            --exclude-module zipfile `
             --upx-dir "C:\ProgramData\chocolatey\bin" `
             main.py
 
