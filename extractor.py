@@ -4,7 +4,7 @@ Handles reading large .xlsx files (up to 200k rows) and filtering by keywords.
 """
 
 import pandas as pd
-from typing import Callable
+from typing import Callable, Optional
 
 
 def load_headers(filepath: str) -> list[str]:
@@ -17,7 +17,7 @@ def extract_rows(
     filepath: str,
     column: str,
     keywords: list[str],
-    progress_callback: Callable[[int, int], None] | None = None,
+    progress_callback: Optional[Callable[[int, int], None]] = None,
     chunk_size: int = 10000,
 ) -> pd.DataFrame:
     """
@@ -32,7 +32,7 @@ def extract_rows(
         column: Column name to search in.
         keywords: List of keywords (OR condition).
         progress_callback: Called with (rows_processed, total_rows).
-        chunk_size: Number of rows to read per chunk.
+        chunk_size: Number of rows per progress update batch.
 
     Returns:
         DataFrame of matched rows with the original column structure.
@@ -40,42 +40,26 @@ def extract_rows(
     if not keywords:
         raise ValueError("At least one keyword is required.")
 
-    # Get total row count for progress reporting (subtract 1 for header)
-    total_rows = sum(1 for _ in pd.read_excel(
-        filepath, usecols=[column], engine="openpyxl", chunksize=chunk_size
-    ))
-    # Re-read with actual chunk iteration
-    reader = pd.read_excel(
-        filepath, engine="openpyxl", chunksize=chunk_size
-    )
+    df = pd.read_excel(filepath, engine="openpyxl", dtype=str)
+    total = len(df)
 
-    results: list[pd.DataFrame] = []
-    processed = 0
+    if progress_callback:
+        progress_callback(0, total)
 
-    for chunk in reader:
-        processed += len(chunk)
+    col_data = df[column]
 
-        col_data = chunk[column]
+    # Skip empty and digit-only cells
+    is_valid = col_data.notna() & col_data.str.strip().ne("") & \
+               ~col_data.str.strip().str.fullmatch(r"\d+")
 
-        # Skip empty and digit-only cells
-        is_valid = col_data.notna() & col_data.astype(str).str.strip().ne("") & \
-                   ~col_data.astype(str).str.strip().str.fullmatch(r"\d+")
+    # OR match across all keywords (partial match)
+    pattern = "|".join(map(_escape_keyword, keywords))
+    is_match = col_data.str.contains(pattern, na=False, regex=True)
 
-        # OR match across all keywords (partial match)
-        pattern = "|".join(map(_escape_keyword, keywords))
-        is_match = col_data.astype(str).str.contains(pattern, na=False, regex=True)
+    if progress_callback:
+        progress_callback(total, total)
 
-        matched = chunk[is_valid & is_match]
-        if not matched.empty:
-            results.append(matched)
-
-        if progress_callback:
-            progress_callback(processed, processed)  # total unknown at chunk level
-
-    if not results:
-        return pd.DataFrame(columns=pd.read_excel(filepath, nrows=0, engine="openpyxl").columns)
-
-    return pd.concat(results, ignore_index=True)
+    return df[is_valid & is_match].reset_index(drop=True)
 
 
 def get_total_rows(filepath: str) -> int:
