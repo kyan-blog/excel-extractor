@@ -69,7 +69,6 @@ jobs:
             --exclude-module telnetlib `
             --exclude-module termios `
             --exclude-module textwrap `
-            --exclude-module tokenize `
             --exclude-module traceback `
             --exclude-module zipfile `
             --upx-dir "C:\ProgramData\chocolatey\bin" `
