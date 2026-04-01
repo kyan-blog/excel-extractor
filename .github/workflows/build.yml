@@ -30,10 +30,16 @@ jobs:
       - name: Build EXE with PyInstaller
         run: |
           pyinstaller --onefile --windowed --name ExcelExtractor `
+            --collect-all numpy `
+            --collect-all pandas `
+            --collect-all openpyxl `
+            --hidden-import numpy `
+            --hidden-import pandas `
+            --hidden-import openpyxl `
+            --hidden-import tkinter `
+            --hidden-import PIL `
             --exclude-module matplotlib `
             --exclude-module PIL `
-            --exclude-module numpy.testing `
-            --exclude-module pandas.tests `
             --upx-dir "C:\ProgramData\chocolatey\bin" `
             main.py
 

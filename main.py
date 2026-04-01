@@ -7,6 +7,28 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+
+def _check_dependencies() -> None:
+    """Verify required libraries are importable before launching the GUI."""
+    missing = []
+    for lib in ("numpy", "pandas", "openpyxl"):
+        try:
+            __import__(lib)
+        except ImportError:
+            missing.append(lib)
+    if missing:
+        # Show error without a full Tk window
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showerror(
+            "起動エラー",
+            "以下のライブラリが見つかりません。アプリを再インストールしてください。\n\n"
+            + "\n".join(f"  ・{m}" for m in missing),
+        )
+        root.destroy()
+        raise SystemExit(1)
+
+
 import extractor
 
 
@@ -199,6 +221,7 @@ class ExcelExtractorApp(tk.Tk):
 
 
 def main():
+    _check_dependencies()
     app = ExcelExtractorApp()
     app.mainloop()
 
