@@ -1,6 +1,8 @@
 .venv/
+.venv311/
 __pycache__/
 *.pyc
 dist/
 build/
 *.spec
+.DS_Store
