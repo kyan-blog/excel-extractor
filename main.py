@@ -17,7 +17,6 @@ def _check_dependencies() -> None:
         except ImportError:
             missing.append(lib)
     if missing:
-        # Show error without a full Tk window
         root = tk.Tk()
         root.withdraw()
         messagebox.showerror(
@@ -37,7 +36,7 @@ class ExcelExtractorApp(tk.Tk):
         super().__init__()
         self.title("Excel 抽出ツール")
         self.resizable(False, False)
-        self.geometry("520x400")
+        self.geometry("520x460")
 
         self._filepath: str = ""
         self._headers: list[str] = []
@@ -61,25 +60,49 @@ class ExcelExtractorApp(tk.Tk):
 
         ttk.Button(file_frame, text="ファイルを開く", command=self._open_file).pack(side="right")
 
+        # --- Header row selection ---
+        header_frame = ttk.LabelFrame(self, text="② ヘッダー行の選択", padding=8)
+        header_frame.pack(fill="x", **pad)
+
+        ttk.Label(header_frame, text="ヘッダー行は何行目ですか？").pack(side="left")
+        self._header_row_var = tk.StringVar(value="1行目")
+        header_combo = ttk.Combobox(
+            header_frame,
+            textvariable=self._header_row_var,
+            values=["1行目", "2行目", "3行目", "4行目", "5行目"],
+            state="readonly",
+            width=8,
+        )
+        header_combo.pack(side="left", padx=(8, 0))
+        header_combo.bind("<<ComboboxSelected>>", self._on_header_row_changed)
+
         # --- Column selection ---
-        col_frame = ttk.LabelFrame(self, text="② 検索対象の列を選択", padding=8)
+        col_frame = ttk.LabelFrame(self, text="③ 検索対象の列を選択", padding=8)
         col_frame.pack(fill="x", **pad)
+
+        col_inner = ttk.Frame(col_frame)
+        col_inner.pack(fill="x")
 
         self._col_var = tk.StringVar()
         self._col_combo = ttk.Combobox(
-            col_frame, textvariable=self._col_var, state="disabled", width=40
+            col_inner, textvariable=self._col_var, state="disabled", width=32
         )
-        self._col_combo.pack(fill="x")
+        self._col_combo.pack(side="left", fill="x", expand=True)
+
+        self._debug_btn = ttk.Button(
+            col_inner, text="先頭10件を確認", command=self._show_sample, state="disabled"
+        )
+        self._debug_btn.pack(side="right", padx=(6, 0))
 
         # --- Keyword input ---
-        kw_frame = ttk.LabelFrame(self, text="③ キーワード入力（カンマ区切りでOR検索）", padding=8)
+        kw_frame = ttk.LabelFrame(self, text="④ キーワード入力（カンマ区切りでOR検索）", padding=8)
         kw_frame.pack(fill="x", **pad)
 
         self._kw_entry = ttk.Entry(kw_frame, width=50)
         self._kw_entry.pack(fill="x")
         ttk.Label(
             kw_frame,
-            text="例: ｱｲｳ,ｴｵ　　※部分一致・空欄/数字のみのセルは除外",
+            text="例: ｱｲｳ,ｴｵ　　※部分一致・大文字小文字区別なし・空欄/数字のみのセルは除外",
             foreground="gray",
         ).pack(anchor="w")
 
@@ -110,6 +133,33 @@ class ExcelExtractorApp(tk.Tk):
         self._result_label.pack(anchor="w", padx=10, pady=4)
 
     # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _get_header_row(self) -> int:
+        """Return the selected header row as a 0-indexed integer."""
+        label = self._header_row_var.get()  # e.g. "2行目"
+        return int(label.replace("行目", "")) - 1
+
+    def _reload_headers(self):
+        """Re-read headers using the currently selected header row."""
+        if not self._filepath:
+            return
+        self._status_label.config(text="ヘッダーを読み込み中...")
+        self.update_idletasks()
+        try:
+            self._headers = extractor.load_headers(self._filepath, header_row=self._get_header_row())
+        except Exception as e:
+            messagebox.showerror("エラー", str(e))
+            return
+        self._col_combo.config(values=self._headers, state="readonly")
+        if self._headers:
+            self._col_combo.current(0)
+        self._run_btn.config(state="normal")
+        self._debug_btn.config(state="normal")
+        self._status_label.config(text=f"列数: {len(self._headers)}")
+
+    # ------------------------------------------------------------------
     # Event handlers
     # ------------------------------------------------------------------
 
@@ -124,22 +174,37 @@ class ExcelExtractorApp(tk.Tk):
         self._filepath = path
         short = path if len(path) <= 60 else "…" + path[-57:]
         self._file_label.config(text=short, foreground="black")
-        self._status_label.config(text="ヘッダーを読み込み中...")
-        self.update_idletasks()
+        self._result_label.config(text="")
+        self._reload_headers()
 
+    def _on_header_row_changed(self, _event=None):
+        """Re-load headers when the user changes the header row selection."""
+        self._reload_headers()
+
+    def _show_sample(self):
+        """Show the first 10 values of the selected column for debugging."""
+        column = self._col_var.get()
+        if not column:
+            messagebox.showwarning("警告", "列を選択してください。")
+            return
         try:
-            self._headers = extractor.load_headers(path)
+            values = extractor.get_sample_values(
+                self._filepath, column, header_row=self._get_header_row()
+            )
         except Exception as e:
-            messagebox.showerror("エラー", f"ファイルの読み込みに失敗しました:\n{e}")
+            messagebox.showerror("エラー", str(e))
             return
 
-        self._col_combo.config(values=self._headers, state="readonly")
-        if self._headers:
-            self._col_combo.current(0)
+        if not values:
+            messagebox.showinfo("先頭10件", "データが見つかりませんでした。")
+            return
 
-        self._run_btn.config(state="normal")
-        self._status_label.config(text=f"列数: {len(self._headers)}")
-        self._result_label.config(text="")
+        lines = "\n".join(f"  {i+1}: {repr(v)}" for i, v in enumerate(values))
+        messagebox.showinfo(
+            f"「{column}」列の先頭{len(values)}件",
+            f"列名: {column}\n\n{lines}\n\n"
+            "※ repr()表示のため、半角スペースや特殊文字も確認できます。",
+        )
 
     def _run_extraction(self):
         if not self._filepath:
@@ -168,16 +233,17 @@ class ExcelExtractorApp(tk.Tk):
 
         threading.Thread(
             target=self._extraction_worker,
-            args=(self._filepath, column, keywords),
+            args=(self._filepath, column, keywords, self._get_header_row()),
             daemon=True,
         ).start()
 
-    def _extraction_worker(self, filepath: str, column: str, keywords: list[str]):
+    def _extraction_worker(self, filepath: str, column: str, keywords: list[str], header_row: int):
         try:
             df = extractor.extract_rows(
                 filepath=filepath,
                 column=column,
                 keywords=keywords,
+                header_row=header_row,
                 progress_callback=self._on_progress,
             )
             self._result_df = df
